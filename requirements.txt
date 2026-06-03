@@ -1,0 +1,9 @@
+streamlit
+transformers
+torch
+sentencepiece
+requests
+beautifulsoup4
+pandas
+streamlit-option-menu
+plotly
