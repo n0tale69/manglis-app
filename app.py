@@ -15,6 +15,26 @@ from streamlit_option_menu import option_menu
 import database as db
 
 # ──────────────────────────────────────────────
+# CONFIGURATION
+# ──────────────────────────────────────────────
+config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+if os.path.exists(config_path):
+    with open(config_path, "r", encoding="utf-8") as f:
+        APP_CONFIG = json.load(f)
+else:
+    APP_CONFIG = {
+        "admin_username": "admin",
+        "admin_password": "password",
+        "models": {
+            "XLM-RoBERTa (Active)": "Habu0410/FYP_Manglish_Model",
+            "BERT (Fine-tuned)": "bert-base-uncased",
+            "mBERT": "bert-base-multilingual-uncased"
+        }
+    }
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(APP_CONFIG, f, indent=4)
+
+# ──────────────────────────────────────────────
 # 1. SLANG DICTIONARY
 # ──────────────────────────────────────────────
 db.init_db()
@@ -22,6 +42,7 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 db.seed_slang_if_empty(base_dir)
 
 SLANG_DICT = db.get_slang_dict()
+TOXIC_ROOTS = db.get_toxic_words()
 
 def compile_slang_pattern(dictionary):
     sorted_keys = sorted(dictionary.keys(), key=len, reverse=True)
@@ -36,18 +57,8 @@ _SLANG_PATTERN = compile_slang_pattern(SLANG_DICT)
 # ──────────────────────────────────────────────
 @st.cache_resource(show_spinner="Loading NLP model — please wait …")
 def load_model(model_name):
-    if model_name == "XLM-RoBERTa (Active)":
-        model_id = "Habu0410/FYP_Manglish_Model"
-        local_only = False
-    elif model_name == "BERT (Fine-tuned)":
-        model_id = "bert-base-uncased"
-        local_only = False
-    elif model_name == "mBERT":
-        model_id = "bert-base-multilingual-uncased"
-        local_only = False
-    else:
-        model_id = "Habu0410/FYP_Manglish_Model"
-        local_only = False
+    model_id = APP_CONFIG.get("models", {}).get(model_name, "Habu0410/FYP_Manglish_Model")
+    local_only = False
 
     if local_only and not os.path.isdir(model_id):
         st.error(f"❌ Model folder not found at `{model_id}`")
@@ -139,7 +150,7 @@ def predict(text: str, tokenizer, model, threshold_pct=50.0):
 # ──────────────────────────────────────────────
 # 6. XAI & SHARED RESULT RENDERER
 # ──────────────────────────────────────────────
-TOXIC_ROOTS = {"bodoh", "babi", "sial", "celaka", "cibai", "puki", "hinaan", "anjing", "lahanat", "gampang", "gila", "cacat", "sundal", "pelacur", "jalang", "bapok", "pondan", "gemuk", "hodoh", "buruk", "hitam", "rasis", "mati", "bunuh", "pundek", "lucah", "bodo"}
+# TOXIC_ROOTS is now dynamically loaded from the database at the top of the file.
 
 def analyze_xai(text: str) -> list[str]:
     tokens = re.split(r'\s+', text.lower())
@@ -187,10 +198,11 @@ def check_password():
 
     st.markdown("""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap');
         html, body, [class*="css"] {
-            font-family: 'Outfit', sans-serif !important;
-            background-color: #0a0e1a !important;
+            font-family: 'JetBrains Mono', monospace !important;
+            background-color: #000000 !important;
+            color: #00ff41 !important;
         }
         header {visibility: hidden;} footer {visibility: hidden;}
         
@@ -199,21 +211,19 @@ def check_password():
         
         /* Grid background on main area */
         [data-testid="stMain"] {
-            background-image: radial-gradient(rgba(0,180,255,0.05) 1px, transparent 1px);
-            background-size: 30px 30px;
+            background-image: linear-gradient(rgba(0,255,65,0.05) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(0,255,65,0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
         }
         
-        /* Turn the main block into a glass card centered in the screen */
+        /* Turn the main block into a terminal card */
         [data-testid="stMainBlockContainer"] {
-            max-width: 440px !important;
+            max-width: 460px !important;
             margin: 0 auto !important;
             padding: 2.5rem 2.5rem !important;
-            background: rgba(15,21,40,0.85);
-            backdrop-filter: blur(30px);
-            -webkit-backdrop-filter: blur(30px);
-            border: 1px solid rgba(0,180,255,0.18);
-            border-radius: 16px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            background: #050505;
+            border: 1px solid #00ff41;
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.2);
             position: absolute;
             top: 50%;
             left: 50%;
@@ -221,57 +231,62 @@ def check_password():
         }
         
         .login-logo {
-            width: 100px;
-            height: 100px;
-            border-radius: 20px;
-            background: linear-gradient(135deg, rgba(0,180,255,0.1), rgba(124,58,237,0.1));
-            border: 1px solid rgba(0,180,255,0.2);
+            width: 80px;
+            height: 80px;
+            border-radius: 0px;
+            background: #000;
+            border: 2px solid #00ff41;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             margin: 0 auto 20px auto;
-            animation: float 3s ease-in-out infinite;
+            box-shadow: 0 0 10px rgba(0,255,65,0.5);
             overflow: hidden;
+            animation: pulse-border 2s infinite;
         }
+        @keyframes pulse-border { 0%,100% { border-color: #00ff41; box-shadow: 0 0 10px rgba(0,255,65,0.5); } 50% { border-color: #008f11; box-shadow: 0 0 2px rgba(0,255,65,0.2); } }
+        
         .login-logo img {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            filter: grayscale(100%) contrast(1.2) sepia(1) hue-rotate(80deg) saturate(3);
         }
-        @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
         
         /* Center all text inputs */
-        .stTextInput label { color: #9ca3af !important; font-size: 0.8rem !important; font-family: 'Outfit', sans-serif !important; }
+        .stTextInput label { color: #00ff41 !important; font-size: 0.8rem !important; font-family: 'JetBrains Mono', monospace !important; }
         .stTextInput input {
-            background-color: rgba(10,14,26,0.6) !important;
-            border: 1px solid rgba(255,255,255,0.1) !important;
-            color: white !important;
-            border-radius: 8px !important;
-            font-family: 'Outfit', sans-serif !important;
+            background-color: #000000 !important;
+            border: 1px solid #333 !important;
+            color: #00ff41 !important;
+            border-radius: 0px !important;
+            font-family: 'JetBrains Mono', monospace !important;
             padding: 0.7rem 0.8rem !important;
         }
         .stTextInput input:focus {
-            border-color: #00b4ff !important;
-            box-shadow: 0 0 0 2px rgba(0,180,255,0.2) !important;
+            border-color: #00ff41 !important;
+            box-shadow: 0 0 8px rgba(0,255,65,0.3) !important;
         }
         
-        /* Full-width gradient sign-in button */
+        /* Terminal sign-in button */
         .stButton > button {
-            background: linear-gradient(135deg, #00b4ff, #7c3aed) !important;
-            color: white !important;
-            border: none !important;
+            background: #000000 !important;
+            color: #00ff41 !important;
+            border: 1px solid #00ff41 !important;
             width: 100% !important;
             padding: 0.75rem 1rem !important;
-            font-weight: 600 !important;
-            font-family: 'Outfit', sans-serif !important;
-            border-radius: 8px !important;
+            font-weight: 700 !important;
+            font-family: 'JetBrains Mono', monospace !important;
+            border-radius: 0px !important;
             font-size: 1rem !important;
             transition: all 0.2s !important;
             margin-top: 10px !important;
+            text-transform: uppercase;
         }
         .stButton > button:hover {
-            box-shadow: 0 0 25px rgba(0,180,255,0.4) !important;
-            transform: translateY(-1px) !important;
+            background: #00ff41 !important;
+            color: #000000 !important;
+            box-shadow: 0 0 15px rgba(0,255,65,0.6) !important;
         }
         
         /* Centered title & text */
@@ -289,47 +304,49 @@ def check_password():
                     <img src="https://pokestop.io/img/pokemon/psyduck-256x256.png" alt="Psyduck Logo" />
                 </div>
             </div>
-            <h2 style="color: #00b4ff; margin: 0 0 6px 0; font-size: 1.6rem; font-weight: 700; text-shadow: 0 0 10px rgba(0,180,255,0.5);">Habu Manglish Cyberbully Detection</h2>
-            <p style="color: #9ca3af; font-size: 0.85rem; margin: 0; line-height: 1.5;">AI-Based Cyberbullying Detection<br>using NLP and BERT</p>
+            <h2 style="color: #00ff41; margin: 0 0 6px 0; font-size: 1.4rem; font-weight: 700; text-shadow: 0 0 8px rgba(0,255,65,0.5); letter-spacing: 2px;">> SYSTEM.AUTH</h2>
+            <p style="color: #008f11; font-size: 0.85rem; margin: 0; line-height: 1.5; font-family: 'JetBrains Mono', monospace;">HABU_MANGLISH_PROTOCOL<br>CYBERBULLY_DETECTION_NODE_v1</p>
         </div>
     ''', unsafe_allow_html=True)
     
-    username = st.text_input("Username", placeholder="Enter username", value="admin")
-    password = st.text_input("Password", type="password", placeholder="Enter password", value="password")
+    cfg_username = APP_CONFIG.get("admin_username", "admin")
+    cfg_password = APP_CONFIG.get("admin_password", "password")
     
-    if st.button("→  Sign In"):
-        if username == "admin" and password == "password":
+    username = st.text_input("Username", placeholder="Enter username", value="")
+    password = st.text_input("Password", type="password", placeholder="Enter password", value="")
+    
+    if st.button("> INITIALIZE_LOGIN_"):
+        if username == cfg_username and password == cfg_password:
             st.session_state.logged_in = True
             st.rerun()
         else:
-            st.error("Invalid credentials (use admin/password)")
+            st.error("ACCESS DENIED")
             
-    st.markdown('<p style="color: #4b5563; font-size: 0.7rem; margin-top: 30px; text-align:center;">Final Year Project — University Demo</p>', unsafe_allow_html=True)
+    st.markdown('<p style="color: #008f11; font-size: 0.7rem; margin-top: 30px; text-align:center; font-family:\'JetBrains Mono\'; text-transform:uppercase;">_SECURE_CONNECTION_ESTABLISHED_</p>', unsafe_allow_html=True)
     return False
 
 def setup_global_css():
     st.markdown("""
         <style>
-        /* Import Outfit Font */
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap');
 
-        /* CSS Variables - Canva Theme */
+        /* CSS Variables - Vibe Coding Theme */
         :root {
-            --bg-main: #0a0e1a;
-            --bg-sidebar: #0f1528;
-            --bg-surface: rgba(15,21,40,0.7);
-            --text-primary: #FFFFFF;
-            --text-secondary: #9ca3af;
-            --accent-blue: #00b4ff;
-            --accent-cyan: #00e5ff;
-            --accent-purple: #7c3aed;
-            --accent-red: #ff3b5c;
-            --accent-green: #00e676;
-            --border-color: rgba(0,180,255,0.12);
+            --bg-main: #000000;
+            --bg-sidebar: #050505;
+            --bg-surface: #0a0a0a;
+            --text-primary: #e0e0e0;
+            --text-secondary: #00ff41;
+            --accent-blue: #00ffff;
+            --accent-cyan: #00ffff;
+            --accent-purple: #ff00ff;
+            --accent-red: #ff3333;
+            --accent-green: #00ff41;
+            --border-color: #333333;
         }
 
         html, body, [class*="css"] {
-            font-family: 'Outfit', sans-serif !important;
+            font-family: 'JetBrains Mono', monospace !important;
             background-color: var(--bg-main) !important;
             color: var(--text-primary) !important;
         }
@@ -339,57 +356,56 @@ def setup_global_css():
         
         /* Grid background pattern */
         [data-testid="stMain"] {
-            background-image: radial-gradient(rgba(0,180,255,0.05) 1px, transparent 1px);
-            background-size: 30px 30px;
+            background-image: linear-gradient(rgba(0,255,65,0.03) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(0,255,65,0.03) 1px, transparent 1px);
+            background-size: 20px 20px;
         }
         
         /* Sidebar styling */
         [data-testid="stSidebar"] {
             background-color: var(--bg-sidebar) !important;
-            border-right: 1px solid rgba(255,255,255,0.05) !important;
+            border-right: 1px solid var(--border-color) !important;
         }
         
-        /* Glass Cards */
+        /* Flat Cards */
         .glass-card {
             background: var(--bg-surface);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
+            border-radius: 0px;
             padding: 20px;
             margin-bottom: 16px;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
         .glass-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 0 30px rgba(0,180,255,0.1);
+            border-color: var(--text-secondary);
+            box-shadow: 0 0 15px rgba(0,255,65,0.1);
         }
         
         /* Stat Cards */
         .stat-card {
             background: var(--bg-surface);
-            backdrop-filter: blur(20px);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
+            border-radius: 0px;
             padding: 16px;
             transition: transform 0.2s, box-shadow 0.2s;
         }
         .stat-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 0 30px rgba(0,180,255,0.15);
+            border-color: var(--text-secondary);
+            box-shadow: 0 0 15px rgba(0,255,65,0.15);
         }
         .stat-label {
-            font-size: 0.65rem;
+            font-size: 0.7rem;
             color: var(--text-secondary);
             text-transform: uppercase;
-            letter-spacing: 1px;
-            font-weight: 500;
+            letter-spacing: 1.5px;
+            font-weight: 700;
         }
         .stat-value {
             font-size: 1.8rem;
             font-weight: 700;
             color: var(--text-primary);
             margin: 4px 0;
+            text-shadow: 0 0 5px rgba(255,255,255,0.3);
         }
         .stat-sub {
             font-size: 0.65rem;
@@ -398,79 +414,86 @@ def setup_global_css():
         /* Sub-metric cards */
         .sub-metric-card {
             background: var(--bg-surface);
-            backdrop-filter: blur(20px);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
+            border-radius: 0px;
             padding: 16px;
             text-align: center;
         }
         .sub-metric-title { font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;}
-        .sub-metric-value { font-size: 1.3rem; color: var(--accent-blue); font-weight: 700; }
+        .sub-metric-value { font-size: 1.3rem; color: var(--accent-cyan); font-weight: 700; text-shadow: 0 0 8px rgba(0,255,255,0.5); }
         
         /* Section titles */
         .section-title {
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--text-primary);
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-secondary);
             margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px dashed var(--border-color);
+            padding-bottom: 5px;
         }
         
         /* Input & Textareas */
         .stTextInput>div>div>input, .stTextArea>div>div>textarea, .stSelectbox>div>div>div {
-            background-color: rgba(10,14,26,0.6) !important;
-            color: white !important;
-            border: 1px solid rgba(255,255,255,0.1) !important;
-            border-radius: 8px !important;
-            font-family: 'Outfit', sans-serif !important;
+            background-color: var(--bg-main) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 0px !important;
+            font-family: 'JetBrains Mono', monospace !important;
         }
         .stTextInput>div>div>input:focus, .stTextArea>div>div>textarea:focus {
-            border-color: #00b4ff !important;
-            box-shadow: 0 0 0 2px rgba(0,180,255,0.2) !important;
+            border-color: var(--text-secondary) !important;
+            box-shadow: 0 0 0 1px var(--text-secondary) !important;
         }
         
-        /* Primary Button - Gradient */
+        /* Primary Button - Terminal */
         .stButton>button {
-            background-color: transparent !important;
-            color: white !important;
-            border: 1px solid rgba(255,255,255,0.1) !important;
-            font-family: 'Outfit', sans-serif !important;
-            border-radius: 8px !important;
-            font-size: 0.8rem !important;
+            background-color: var(--bg-main) !important;
+            color: var(--text-secondary) !important;
+            border: 1px solid var(--text-secondary) !important;
+            font-family: 'JetBrains Mono', monospace !important;
+            border-radius: 0px !important;
+            font-size: 0.85rem !important;
             transition: all 0.2s !important;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
         .stButton>button:hover {
-            border-color: rgba(0,180,255,0.3) !important;
-            background: rgba(0,180,255,0.1) !important;
+            background: var(--text-secondary) !important;
+            color: var(--bg-main) !important;
+            box-shadow: 0 0 15px rgba(0,255,65,0.4) !important;
         }
         .stButton>button[kind="primary"] {
-            background: linear-gradient(135deg, #00b4ff, #0090cc) !important;
-            border: none !important;
-            font-weight: 600 !important;
+            background: var(--text-secondary) !important;
+            color: var(--bg-main) !important;
+            border: 1px solid var(--text-secondary) !important;
+            font-weight: 700 !important;
         }
         .stButton>button[kind="primary"]:hover {
-            box-shadow: 0 0 20px rgba(0,180,255,0.4) !important;
-            transform: translateY(-1px) !important;
+            box-shadow: 0 0 20px rgba(0,255,65,0.6) !important;
         }
         
         /* Dataframes */
         [data-testid="stDataFrame"] {
             background: var(--bg-surface);
             border: 1px solid var(--border-color);
-            border-radius: 8px;
+            border-radius: 0px;
         }
         
         /* Slider */
-        .stSlider [data-testid="stThumbValue"] { color: #00b4ff; }
+        .stSlider [data-testid="stThumbValue"] { color: var(--accent-cyan); }
         
         /* Custom scrollbar */
         ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #0a0e1a; }
-        ::-webkit-scrollbar-thumb { background: rgba(0,180,255,0.3); border-radius: 3px; }
+        ::-webkit-scrollbar-track { background: var(--bg-main); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 0px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
         
         /* Top header bar */
         .top-header {
-            background: rgba(15,21,40,0.5);
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border-color);
             padding: 10px 20px;
             display: flex;
             align-items: center;
@@ -483,31 +506,33 @@ def setup_global_css():
             align-items: center;
             gap: 6px;
             padding: 4px 10px;
-            border-radius: 999px;
-            background: rgba(0,230,118,0.1);
-            color: #00e676;
+            border: 1px solid var(--text-secondary);
+            background: rgba(0,255,65,0.05);
+            color: var(--text-secondary);
             font-size: 0.65rem;
-            font-weight: 500;
+            font-weight: 700;
+            text-transform: uppercase;
         }
         .model-badge-dot {
             width: 6px; height: 6px;
-            background: #00e676;
+            background: var(--text-secondary);
             border-radius: 50%;
-            animation: pulse-neon 2s infinite;
+            animation: pulse-neon 1.5s infinite;
         }
-        @keyframes pulse-neon { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+        @keyframes pulse-neon { 0%,100% { opacity: 1; box-shadow: 0 0 5px var(--text-secondary); } 50% { opacity: 0.4; box-shadow: none; } }
         
         /* Progress bars for toxic words */
         .toxic-bar-bg {
             height: 6px;
-            background: #0a0e1a;
-            border-radius: 3px;
+            background: var(--bg-main);
+            border: 1px solid var(--border-color);
+            border-radius: 0px;
             overflow: hidden;
         }
         .toxic-bar-fill {
             height: 100%;
-            background: #ff3b5c;
-            border-radius: 3px;
+            background: var(--accent-red);
+            border-radius: 0px;
             transition: width 0.8s ease;
         }
         
@@ -517,12 +542,9 @@ def setup_global_css():
             text-align: center;
             font-size: 1.2rem;
             font-weight: 700;
-            border-radius: 4px;
+            border: 1px solid var(--border-color);
         }
         
-        /* Animations */
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-in { animation: fadeIn 0.5s ease forwards; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -576,21 +598,23 @@ def main():
             default_index=idx,
             styles={
                 "container": {"padding": "0!important", "background-color": "transparent"},
-                "icon": {"color": "#9ca3af", "font-size": "14px"}, 
+                "icon": {"color": "#00ff41", "font-size": "14px"}, 
                 "nav-link": {
                     "font-size": "13px", 
                     "text-align": "left", 
                     "margin":"0px", 
-                    "--hover-color": "rgba(0,180,255,0.1)",
+                    "--hover-color": "rgba(0,255,65,0.1)",
                     "color": "#9ca3af",
-                    "font-family": "'Outfit', sans-serif"
+                    "font-family": "'JetBrains Mono', monospace",
+                    "text-transform": "uppercase"
                 },
                 "nav-link-selected": {
-                    "background-color": "rgba(0,180,255,0.15)", 
-                    "color": "#ffffff",
-                    "border-right": "2px solid #00b4ff",
+                    "background-color": "rgba(0,255,65,0.1)", 
+                    "color": "#00ff41",
+                    "border-left": "2px solid #00ff41",
+                    "border-right": "none",
                     "border-radius": "0px",
-                    "font-weight": "600"
+                    "font-weight": "700"
                 },
             }
         )
@@ -614,7 +638,7 @@ def main():
     <div class="top-header">
         <h3 style="margin:0; font-size:0.9rem; font-weight:600;">{page_titles.get(page, page)}</h3>
         <div style="display:flex; align-items:center; gap:12px;">
-            <div class="model-badge"><span class="model-badge-dot"></span> BERT Model Active</div>
+            <div class="model-badge"><span class="model-badge-dot"></span> {st.session_state.active_model} Active</div>
             <div style="width:28px; height:28px; border-radius:50%; background:rgba(0,180,255,0.2); display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:700; color:#00b4ff;">A</div>
         </div>
     </div>
@@ -666,6 +690,28 @@ def main():
             </div>
             ''', unsafe_allow_html=True)
             
+        # Load dynamic metrics
+        csv_path = os.path.join(base_dir, "data", "binary_performance.csv")
+        model_acc = "N/A"
+        model_prec = "N/A"
+        model_rec = "N/A"
+        model_f1 = "N/A"
+        if os.path.exists(csv_path):
+            df_perf = pd.read_csv(csv_path)
+            csv_model_name = "XLM-R"
+            if st.session_state.active_model == "mBERT":
+                csv_model_name = "mBERT"
+            elif st.session_state.active_model == "BERT (Fine-tuned)":
+                csv_model_name = "DistilBERT"
+                
+            model_row = df_perf[df_perf['Model'] == csv_model_name]
+            if not model_row.empty:
+                acc = float(model_row.iloc[0]['Accuracy'])
+                model_acc = f"{acc*100:.1f}%"
+                model_prec = f"{float(model_row.iloc[0]['Precision (Hate)']):.3f}"
+                model_rec = f"{float(model_row.iloc[0]['Recall (Hate)']):.3f}"
+                model_f1 = f"{float(model_row.iloc[0]['F1 (Hate)']):.3f}"
+
         with col4:
             st.markdown(f'''
             <div class="stat-card">
@@ -673,16 +719,16 @@ def main():
                     <span class="stat-label">Model Accuracy</span>
                     <span style="color:#00e5ff;">🎯</span>
                 </div>
-                <div class="stat-value" style="color:#00e5ff;">96.4%</div>
-                <div class="stat-sub" style="color:#9ca3af;">BERT fine-tuned</div>
+                <div class="stat-value" style="color:#00e5ff;">{model_acc}</div>
+                <div class="stat-sub" style="color:#9ca3af;">{st.session_state.active_model}</div>
             </div>
             ''', unsafe_allow_html=True)
 
         # Metrics Row
         sm1, sm2, sm3 = st.columns(3)
-        with sm1: st.markdown('<div class="sub-metric-card"><div class="sub-metric-title">Precision</div><div class="sub-metric-value">0.952</div></div>', unsafe_allow_html=True)
-        with sm2: st.markdown('<div class="sub-metric-card"><div class="sub-metric-title">Recall</div><div class="sub-metric-value">0.948</div></div>', unsafe_allow_html=True)
-        with sm3: st.markdown('<div class="sub-metric-card"><div class="sub-metric-title">F1-Score</div><div class="sub-metric-value">0.950</div></div>', unsafe_allow_html=True)
+        with sm1: st.markdown(f'<div class="sub-metric-card"><div class="sub-metric-title">Precision</div><div class="sub-metric-value">{model_prec}</div></div>', unsafe_allow_html=True)
+        with sm2: st.markdown(f'<div class="sub-metric-card"><div class="sub-metric-title">Recall</div><div class="sub-metric-value">{model_rec}</div></div>', unsafe_allow_html=True)
+        with sm3: st.markdown(f'<div class="sub-metric-card"><div class="sub-metric-title">F1-Score</div><div class="sub-metric-value">{model_f1}</div></div>', unsafe_allow_html=True)
 
         with st.expander("ℹ️ How are these metrics calculated?"):
             st.markdown("""

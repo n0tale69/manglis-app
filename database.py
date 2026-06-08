@@ -44,9 +44,21 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS Slang_Lexicon (
             slang TEXT PRIMARY KEY,
-            standard_word TEXT NOT NULL
+            standard_word TEXT NOT NULL,
+            is_toxic INTEGER DEFAULT 0
         )
     ''')
+
+    try:
+        cursor.execute("ALTER TABLE Slang_Lexicon ADD COLUMN is_toxic INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass # Column already exists
+
+    # Migrate initial toxic words to the new column
+    toxic_roots = ["bodoh", "babi", "sial", "celaka", "cibai", "puki", "hinaan", "anjing", "lahanat", "gampang", "gila", "cacat", "sundal", "pelacur", "jalang", "bapok", "pondan", "gemuk", "hodoh", "buruk", "hitam", "rasis", "mati", "bunuh", "pundek", "lucah", "bodo"]
+    for word in toxic_roots:
+        cursor.execute("UPDATE Slang_Lexicon SET is_toxic = 1 WHERE standard_word = ?", (word,))
+        cursor.execute("UPDATE Slang_Lexicon SET is_toxic = 1 WHERE slang = ?", (word,))
 
     conn.commit()
     conn.close()
@@ -96,6 +108,21 @@ def get_slang_dict():
     conn.close()
     return {row['slang']: row['standard_word'] for row in rows}
 
+def get_toxic_words():
+    """Retrieve words flagged as toxic."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT DISTINCT standard_word FROM Slang_Lexicon WHERE is_toxic = 1")
+        rows1 = cursor.fetchall()
+        cursor.execute("SELECT DISTINCT slang FROM Slang_Lexicon WHERE is_toxic = 1")
+        rows2 = cursor.fetchall()
+        toxic = [row[0] for row in rows1] + [row[0] for row in rows2]
+    except sqlite3.OperationalError:
+        toxic = []
+    conn.close()
+    return set(toxic)
+
 def log_prediction(input_text, cleaned_text, predicted_label, confidence_score, processing_time_ms):
     """Log a prediction event into Prediction_Logs."""
     conn = get_connection()
@@ -107,14 +134,14 @@ def log_prediction(input_text, cleaned_text, predicted_label, confidence_score, 
     conn.commit()
     conn.close()
 
-def add_or_update_slang(slang, standard_word):
+def add_or_update_slang(slang, standard_word, is_toxic=0):
     """Add or update a slang entry."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT OR REPLACE INTO Slang_Lexicon (slang, standard_word)
-        VALUES (?, ?)
-    ''', (slang.lower().strip(), standard_word.lower().strip()))
+        INSERT OR REPLACE INTO Slang_Lexicon (slang, standard_word, is_toxic)
+        VALUES (?, ?, ?)
+    ''', (slang.lower().strip(), standard_word.lower().strip(), is_toxic))
     conn.commit()
     conn.close()
 
