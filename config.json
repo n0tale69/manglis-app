@@ -1,0 +1,9 @@
+{
+    "admin_username": "admin",
+    "admin_password": "password",
+    "models": {
+        "XLM-RoBERTa (Active)": "Habu0410/FYP_Manglish_Model",
+        "BERT (Fine-tuned)": "bert-base-uncased",
+        "mBERT": "bert-base-multilingual-uncased"
+    }
+}

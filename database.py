@@ -170,7 +170,7 @@ def get_stats():
     cursor.execute("SELECT COUNT(*) FROM Prediction_Logs")
     total_analyzed = cursor.fetchone()[0]
     
-    cursor.execute("SELECT COUNT(*) FROM Prediction_Logs WHERE predicted_label != 'SAFE'")
+    cursor.execute("SELECT COUNT(*) FROM Prediction_Logs WHERE UPPER(predicted_label) NOT IN ('SAFE', 'NON-HATE', 'LABEL_0', '0')")
     total_cyberbullying = cursor.fetchone()[0]
     
     cursor.execute("SELECT AVG(confidence_score) FROM Prediction_Logs")
